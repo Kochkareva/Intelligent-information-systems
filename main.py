@@ -1,102 +1,88 @@
-import os.path
+from operator import itemgetter
 import numpy as np
-from matplotlib import pyplot as plt
-from sklearn.datasets import make_classification
-from sklearn.linear_model import LinearRegression, Perceptron
-from sklearn.metrics import accuracy_score
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import PolynomialFeatures
+from sklearn.feature_selection import RFE, f_regression
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.linear_model import Ridge
+from sklearn.linear_model import LinearRegression
 
-picfld = os.path.join('static', 'charts')
-
-X, y = make_classification(n_samples=500, n_features=2, n_redundant=0,
-                           n_informative=2, random_state=None,
-                           n_clusters_per_class=1)
-# sklearn.datasets.samples_generator.make_classification - используется для создания случайных задач классификации N.
-# n_samples - Количество случайных чисел
-# n_features - количество признаков (измерений) для каждого числа.
-# n_informative - Количество информативных характеристик
-# n_redundant -количество избыточных признаков, которые не вносят дополнительной информации.
-# random_state - опциональный параметр для установки начального состояния генератора случайных чисел.
-# n_clusters_per_class - Количество кластера в каждой категории
-# Функция возвращает два значения:
-# X: массив размера [n_samples, n_features], содержащий сгенерированные признаки.
-# y: массив размера [n_samples], содержащий сгенерированные целевые переменные (классы).
-
-rng = np.random.RandomState(2)
-# добавление шума к данным
-X += 2 * rng.uniform(size=X.shape)
-linearly_dataset = (X, y)
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=.4, random_state=42)
-
-# Модель: линейная регрессия
-def linear_regression():
-    # Модель линейной регрессии
-    model = LinearRegression()
-    # Обучение на тренировочных данных
-    model.fit(X_train, y_train)
-    # Выполнение прогноза
-    y_pred = model.predict(X_test)
-    # Вычисление коэффициента детерминации
-    r_sq = model.score(X_test, y_test)
-    # Создание графика
-    plt.plot(y_test, c="#bd0000", label="\"y\" исходная")
-    plt.plot(y_pred, c="#00BFFF", label="\"y\" предсказанная \n" "Кд = " + str(r_sq))
-    plt.title("Линейная регрессия")
-    plt.legend(loc='lower left')
-    plt.savefig('static/charts/LinearRegressionChart.png')
-    plt.close()
+# генерируем исходные данные: 750 строк-наблюдений и 14 столбцов-признаков
+np.random.seed(0)
+size = 750
+X = np.random.uniform(0, 1, (size, 14))
+# Задаем функцию-выход: регрессионную проблему Фридмана
+Y = (10 * np.sin(np.pi*X[:, 0]*X[:, 1]) + 20*(X[:, 2] - .5)**2 + 10*X[:, 3] + 5*X[:, 4]**5 + np.random.normal(0, 1))
+# Добавляем зависимость признаков
+X[:, 10:] = X[:, :4] + np.random.normal(0, .025, (size, 4))
+names = ["x%s" % i for i in range(1, 15)]  # - список признаков вида ['x1', 'x2', 'x3', ..., 'x14']
+ranks = dict()
 
 
-# Модель: полиномиальная регрессия (со степенью 4)
-def polynomial_regression():
-    # Генерирование объекта полинома,
-    # где degree - степень полинома,
-    # include_bias - установка вектора смещения в полиномиальные признаки
-    pf = PolynomialFeatures(degree=4, include_bias=False)
-    # Преобразование исходного набора данных X_train в полиномиальные признаки
-    X_poly_train = pf.fit_transform(X_train)
-    # Преобразование исходного набора данных X_test в полиномиальные признаки
-    X_poly_test = pf.fit_transform(X_test)
-    # Модель линейной регрессии
-    model = LinearRegression()
-    # Обучение модели линейной регрессии на преобразованных полиномиальных признаках
-    model.fit(X_poly_train, y_train)
-    # Выполнение прогноза
-    y_pred = model.predict(X_poly_test)
-    # Вычисление коэффициента детерминации
-    r_sq = model.score(X_poly_test, y_test)
-    # Создание графика
-    plt.plot(y_test, c="#bd0000", label="\"y\" исходная")
-    plt.plot(y_pred, c="#00BFFF",
-             label="\"y\" предсказанная \n" "Кд = " + str(r_sq))
-    plt.legend(loc='lower left')
-    plt.title("Полиномиальная регрессия")
-    plt.savefig('static/charts/PolynomialRegressionChart.png')
-    plt.close()
+def rank_to_dict(ranks, names):
+     # получение абсолютных значений оценок(модуля)
+     ranks = np.abs(ranks)
+     minmax = MinMaxScaler()
+     # преобразование данных
+     ranks = minmax.fit_transform(np.array(ranks).reshape(14, 1)).ravel()
+     # округление элементов массива
+     ranks = map(lambda x: round(x, 2), ranks)
+     # преобразование данных
+     return dict(zip(names, ranks))
 
 
-# Модель: персептрон
-def perceptron():
-    # Модель персептрона
-    model = Perceptron()
-    # Обучение на тренировочных данных
-    model.fit(X_train, y_train)
-    # Выполнение прогноза
-    y_pred = model.predict(X_test)
-    # Вычисление точности работы персептрона
-    accuracy = accuracy_score(y_test, y_pred)
-    # Создание графика
-    plt.plot(y_test, c="#bd0000", label="\"y\" исходная")
-    plt.plot(y_pred, c="#00BFFF",
-             label="\"y\" предсказанная \n" "Точность = " + str(accuracy))
-    plt.legend(loc='lower left')
-    plt.title("Персептрон")
-    plt.savefig('static/charts/PerceptronChart.png')
-    plt.close()
+# Модель: случайное Лассо (RandomizedLasso) - устаревшее, поэтому используем Ridge-регрессия (Ridge Regression)
+def ridge_regressions():
+    # Создание экземпляра модели Ridge
+    ridge_model = Ridge()
+    ridge_model.fit(X, Y)
+    ranks['Ridge'] = rank_to_dict(ridge_model.coef_, names)
+
+
+# Модель: рекурсивное сокращение признаков (Recursive Feature Elimination – RFE)
+def recursive_feature_elimination():
+    # создание модели LinearRegression
+    estimator = LinearRegression()
+    # создание модели RFE
+    rfe_model = RFE(estimator)
+    rfe_model.fit(X, Y)
+    ranks['Recursive Feature Elimination'] = rank_to_dict_rfe(rfe_model.ranking_, names)
+
+
+def rank_to_dict_rfe(ranking, names):
+    # нахождение обратных значений рангов
+    n_ranks = [float(1 / i) for i in ranking]
+    # округление элементов массива
+    n_ranks = map(lambda x: round(x, 2), n_ranks)
+    # преобразование данных
+    return dict(zip(names, n_ranks))
+
+
+# Модель: линейная корреляция (f_regression)
+def linear_correlation():
+    # вычисление линейной корреляции между X и y
+    correlation, p_values = f_regression(X, Y)
+    ranks['linear correlation'] = rank_to_dict(correlation, names)
 
 
 if __name__ == '__main__':
-    linear_regression()
-    polynomial_regression()
-    perceptron()
+    ridge_regressions()
+    recursive_feature_elimination()
+    linear_correlation()
+
+    for key, value in ranks.items():  # Вывод нормализованных оценок важности признаков каждой модели
+        ranks[key] = sorted(value.items(), key=itemgetter(1), reverse=True)
+    for key, value in ranks.items():
+        print(key)
+        print(value)
+
+    mean = {}  # - нахождение средних значений оценок важности по 3м моделям
+    for key, value in ranks.items():
+        for item in value:
+            if item[0] not in mean:
+                mean[item[0]] = 0
+            mean[item[0]] += item[1]
+    for key, value in mean.items():
+        res = value / len(ranks)
+        mean[key] = round(res, 2)
+    mean = sorted(mean.items(), key=itemgetter(1), reverse=True)
+    print("Mean")
+    print(mean)
