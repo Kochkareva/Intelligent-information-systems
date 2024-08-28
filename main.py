@@ -1,95 +1,68 @@
 import os.path
-import numpy as np
 import pandas as pd
-from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score, davies_bouldin_score
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression
+from matplotlib import pyplot as plt
 from sklearn.feature_selection import RFE
-import matplotlib.pyplot as plt
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+
+#Задачи анализа, решаемые регрессией: предсказать диапазон окладов или компенсаций
+# на основе других признаков: опыт, квалификация, тип работы и т.д.
 
 
 picfld = os.path.join('static', 'charts')
 
 data = pd.read_csv('D:/Интеллектуальные информационные системы/Dataset/updated_job_descriptions.csv')
-data_orig = pd.read_csv('D:/Интеллектуальные информационные системы/Dataset/job_descriptions.csv')
-y = data['Country']
 
-
-def k_means():
+def linear_regression_min_salary():
+    y = data['Min Salary']
     df = data.copy()
-    df.drop(['Country', 'location', 'Company Size', 'Preference', 'Job Title', 'Role', 'Job Portal',
-             'skills', 'Company', 'Min Experience', 'Max Experience', 'Min Salary',
-             'Max Salary', 'Sector', 'Industry', 'City', 'State', 'Ticker', 'year', 'month', 'day',
-             "'Casual Dress Code, Social and Recreational Activities, Employee Referral Programs, Health and Wellness Facilities, Life and Disability Insurance'",
-             "'Childcare Assistance, Paid Time Off (PTO), Relocation Assistance, Flexible Work Arrangements, Professional Development'",
-             "'Employee Assistance Programs (EAP), Tuition Reimbursement, Profit-Sharing, Transportation Benefits, Parental Leave'",
-             "'Employee Referral Programs, Financial Counseling, Health and Wellness Facilities, Casual Dress Code, Flexible Spending Accounts (FSAs)'",
-             "'Flexible Spending Accounts (FSAs), Relocation Assistance, Legal Assistance, Employee Recognition Programs, Financial Counseling'",
-             "'Health Insurance, Retirement Plans, Flexible Work Arrangements, Employee Assistance Programs (EAP), Bonuses and Incentive Programs'",
-             "'Health Insurance, Retirement Plans, Paid Time Off (PTO), Flexible Work Arrangements, Employee Assistance Programs (EAP)'",
-             "'Legal Assistance, Bonuses and Incentive Programs, Wellness Programs, Employee Discounts, Retirement Plans'",
-             "'Life and Disability Insurance, Stock Options or Equity Grants, Employee Recognition Programs, Health Insurance, Social and Recreational Activities'",
-             "'Transportation Benefits, Professional Development, Bonuses and Incentive Programs, Profit-Sharing, Employee Discounts'",
-             "'Tuition Reimbursement, Stock Options or Equity Grants, Parental Leave, Wellness Programs, Childcare Assistance'"],
+    # удаляем целевое значение и наименее важные параметры
+    df.drop(['Min Salary', 'Preference', 'day', 'month', 'Job Portal', 'State', 'location', 'Country', 'Industry', 'skills',
+             'Role', 'Job Title', 'City', 'Sector', 'Ticker', 'Company Size', 'Company', 'Max Salary'],
             axis=1, inplace=True)
-    X_train, X_test, y_train, y_test = train_test_split(df, y, test_size=0.2)
-    kmeans = KMeans(n_clusters=9)
-    kmeans.fit(X_train.values)
-    labels = kmeans.predict(X_test.values)
-    centroids = kmeans.cluster_centers_
-    print("Координаты центроидов:", centroids)
-    plt.scatter(X_test['Qualifications'], X_test['Work Type'], c=labels, cmap='viridis')
-    plt.scatter(centroids[:, 0], centroids[:, 1], marker='x', color='red')
-    plt.xlabel('Qualifications')
-    plt.ylabel('Work Type')
-    plt.title('KMeans Clustering')
-    plt.savefig('static/charts/KMeansClustering.png')
+    X_train, X_test, y_train, y_test = train_test_split(df.values, y.values, test_size=0.0002, train_size=0.2)
+    model = LinearRegression()
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    r_sq = model.score(X_test, y_test)
+    plt.plot(y_test, c="#bd0000", label="\"y\" исходная")
+    plt.plot(y_pred, c="#00BFFF",
+             label="\"y\" предсказанная \n" "Кд = " + str(r_sq))
+    plt.legend(loc='lower left')
+    plt.title("Линейная регрессия")
+    plt.savefig('static/charts/MinSalaryChart.png')
     plt.close()
-    print("Уникальных Work Type :", data['Work Type'].nunique())
-    print("Уникальных Qualifications:", data['Qualifications'].nunique())
-    unique_labels = np.unique(labels)
-    for label in unique_labels:
-        indices = np.where(labels == label)
-        y_values = data_orig.loc[indices, 'Country'].values
-        print(f"Значения y для кластера {label}: {y_values}")
-    # Оценка силуэтного коэффициента
-    silhouette = silhouette_score(X_test.values, kmeans.predict(X_test.values))
-    print("Силуэтный коэффициент:", silhouette)
-    # Оценка индекса Дэвиса-Болдина
-    davies_bouldin = davies_bouldin_score(X_test.values, kmeans.predict(X_test.values))
-    print("Индекс Дэвиса-Болдина:", davies_bouldin)
 
 
-# оценка количества кластеров
-def selection_number_clusters():
+def linear_regression_max_salary():
+    y = data['Max Salary']
     df = data.copy()
-    df.drop(['Country', 'location', 'Company Size', 'Job Title', 'Role',
-             'skills', 'Company', 'Max Experience', 'Min Salary',
-             'Max Salary', 'Sector', 'Industry', 'City', 'State', 'Ticker', 'year', 'month', 'day'
-             ],
-            axis=1, inplace=True)
-    X_train, X_test, y_train, y_test = train_test_split(df, y, test_size=0.2)
-    inertias = []
-    for k in range(1, 15):
-        kmeans = KMeans(n_clusters=k, random_state=1).fit(X_train.values, y_train.values)
-        inertias.append(np.sqrt(kmeans.inertia_))
-    plt.plot(range(1, 15), inertias, marker='o')
-    plt.xlabel('Number of clusters')
-    plt.ylabel('Inertia')
-    plt.title("Метод локтя")
-    plt.savefig('static/charts/ElbowMethod.png')
+    # удаляем целевое значение и наименее важные параметры
+    df.drop(['Max Salary',  'Max Experience', 'Job Portal', 'day', 'Sector', 'Industry', 'Country', 'location', 'Job Title',
+             'Ticker', 'Company', 'City', 'State', 'Role', 'skills', 'Qualifications', 'Company Size', 'Min Salary'], axis=1, inplace=True)
+    X_train, X_test, y_train, y_test = train_test_split(df.values, y.values, test_size=0.0002, train_size=0.2)
+    model = LinearRegression()
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    r_sq = model.score(X_test, y_test)
+    plt.plot(y_test, c="#bd0000", label="\"y\" исходная")
+    plt.plot(y_pred, c="#00BFFF",
+             label="\"y\" предсказанная \n" "Кд = " + str(r_sq))
+    plt.legend(loc='lower left')
+    plt.title("Линейная регрессия")
+    plt.savefig('static/charts/MaxSalaryChart.png')
     plt.close()
 
 
 # оценка важности параметров
-def recursive_feature_elimination():
+def RFE_max_salary():
     df = data.copy()
-    df.drop(["Country", "location"], axis=1, inplace=True)
-    X_train, X_test, y_train, y_test = train_test_split(df, y, test_size=0.2)
-    column_names = ['Qualifications', 'Work Type', 'Company Size', 'Preference', 'Job Title', 'Role', 'Job Portal',
+    y = data['Max Salary']
+    df.drop(["Max Salary"], axis=1, inplace=True)
+    X_train, X_test, y_train, y_test = train_test_split(df.values, y.values, test_size=0.2)
+    column_names = ['Qualifications', 'Country', 'location', 'Work Type', 'Company Size', 'Preference', 'Job Title', 'Role', 'Job Portal',
                     'skills', 'Company', 'Min Experience', 'Max Experience', 'Min Salary',
-                    'Max Salary', 'Sector', 'Industry', 'City', 'State', 'Ticker', 'year', 'month', 'day',
+                    'Sector', 'Industry', 'City', 'State', 'Ticker', 'year', 'month', 'day',
                     "'Casual Dress Code, Social and Recreational Activities, Employee Referral Programs, Health and Wellness Facilities, Life and Disability Insurance'",
                     "'Childcare Assistance, Paid Time Off (PTO), Relocation Assistance, Flexible Work Arrangements, Professional Development'",
                     "'Employee Assistance Programs (EAP), Tuition Reimbursement, Profit-Sharing, Transportation Benefits, Parental Leave'",
@@ -101,12 +74,40 @@ def recursive_feature_elimination():
                     "'Life and Disability Insurance, Stock Options or Equity Grants, Employee Recognition Programs, Health Insurance, Social and Recreational Activities'",
                     "'Transportation Benefits, Professional Development, Bonuses and Incentive Programs, Profit-Sharing, Employee Discounts'",
                     "'Tuition Reimbursement, Stock Options or Equity Grants, Parental Leave, Wellness Programs, Childcare Assistance'"]
-
     estimator = LinearRegression()
     rfe_model = RFE(estimator)
-    rfe_model.fit(X_train.values, y_train.values)
+    rfe_model.fit(X_train, y_train)
     ranks = rank_to_dict_rfe(rfe_model.ranking_, column_names)
     sorted_dict = dict(sorted(ranks.items(), key=lambda x: x[1], reverse=True))
+    print("Оценка важности параметров для нахождения максимальной оплаты труда")
+    print(sorted_dict)
+
+
+def RFE_min_salary():
+    df = data.copy()
+    y = data['Min Salary']
+    df.drop(["Min Salary"], axis=1, inplace=True)
+    X_train, X_test, y_train, y_test = train_test_split(df.values, y.values, test_size=0.2)
+    column_names = ['Qualifications', 'Country', 'location', 'Work Type', 'Company Size', 'Preference', 'Job Title', 'Role', 'Job Portal',
+                    'skills', 'Company', 'Min Experience', 'Max Experience', 'Max Salary',
+                    'Sector', 'Industry', 'City', 'State', 'Ticker', 'year', 'month', 'day',
+                    "'Casual Dress Code, Social and Recreational Activities, Employee Referral Programs, Health and Wellness Facilities, Life and Disability Insurance'",
+                    "'Childcare Assistance, Paid Time Off (PTO), Relocation Assistance, Flexible Work Arrangements, Professional Development'",
+                    "'Employee Assistance Programs (EAP), Tuition Reimbursement, Profit-Sharing, Transportation Benefits, Parental Leave'",
+                    "'Employee Referral Programs, Financial Counseling, Health and Wellness Facilities, Casual Dress Code, Flexible Spending Accounts (FSAs)'",
+                    "'Flexible Spending Accounts (FSAs), Relocation Assistance, Legal Assistance, Employee Recognition Programs, Financial Counseling'",
+                    "'Health Insurance, Retirement Plans, Flexible Work Arrangements, Employee Assistance Programs (EAP), Bonuses and Incentive Programs'",
+                    "'Health Insurance, Retirement Plans, Paid Time Off (PTO), Flexible Work Arrangements, Employee Assistance Programs (EAP)'",
+                    "'Legal Assistance, Bonuses and Incentive Programs, Wellness Programs, Employee Discounts, Retirement Plans'",
+                    "'Life and Disability Insurance, Stock Options or Equity Grants, Employee Recognition Programs, Health Insurance, Social and Recreational Activities'",
+                    "'Transportation Benefits, Professional Development, Bonuses and Incentive Programs, Profit-Sharing, Employee Discounts'",
+                    "'Tuition Reimbursement, Stock Options or Equity Grants, Parental Leave, Wellness Programs, Childcare Assistance'"]
+    estimator = LinearRegression()
+    rfe_model = RFE(estimator)
+    rfe_model.fit(X_train, y_train)
+    ranks = rank_to_dict_rfe(rfe_model.ranking_, column_names)
+    sorted_dict = dict(sorted(ranks.items(), key=lambda x: x[1], reverse=True))
+    print("Оценка важности параметров для нахождения минимальной оплаты труда")
     print(sorted_dict)
 
 
@@ -117,6 +118,8 @@ def rank_to_dict_rfe(ranking, names):
 
 
 if __name__ == '__main__':
-    # selection_number_clusters()
-    # recursive_feature_elimination()
-    k_means()
+    # linear_regression_min_salary()
+    # linear_regression_max_salary()
+    RFE_min_salary()
+    RFE_max_salary()
+
